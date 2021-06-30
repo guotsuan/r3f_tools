@@ -634,6 +634,50 @@ class R3F:
         self.read_data()
         end = perf_counter()
         print('Elapsed time is: {}'.format((end-start)))
+        
+    def get_power_spectrum(self, rbw=30, fs=112e6, avg_n = 1, freq_unit = 'khz', unit='dBm', fil_k=2.23, fil_beta=16.7):
+        # the unit for frequency is khz.
+        from numpy.fft import fft
+        from scipy.fftpack import fftfreq, fftshift
+        k = 2.23
+        beta = 16.7
+
+        if freq_unit == 'khz':
+            rbw = rbw # khz
+            sample_rate = fs # khz
+        else:
+            print("Be care of the unit of Mhz")
+
+        data_n = np.int64(k * sample_rate / rbw /1e3) + 1
+
+
+        avg_n = avg_n
+        unit = unit
+
+        kasier_fil = np.kaiser(data_n, beta)
+        factor_kasier = np.sum(kasier_fil)/data_n
+
+
+        timestep = 1.0/sample_rate
+
+        result = np.zeros((data_n, avg_n))
+
+        for k in np.arange(avg_n): 
+            fft_data = fft(self.IQ[k*data_n:(k+1)*data_n]*kasier_fil, norm='ortho')
+            freq = fftfreq(data_n, timestep)
+            freq = fftshift(freq)
+            fft_data = fftshift(fft_data)
+
+            if unit == 'dBm':
+                print("unit is dBm")
+                dbm = 10*np.log10(np.abs(fft_data)**2/freq.size/(50*1e-3)/factor_kasier) 
+                result[:, k] = dbm
+            else:
+                result[:, k] = np.abs(fft_data)**2/freq.size/factor_kasier
+
+
+        return (freq, np.mean(result, axis=1))
+
 
 def main():
     r3f = R3F()
